@@ -44,15 +44,15 @@ blocks {
 }
 ```
 
-This will return a list of `BlockTypes`, defined in`block-type.php`. Let’s break down each of these fields:
+This will return a list of `BlockTypes`, defined in`src/types/Blocktype.php`. Let’s break down each of these fields:
 
 ### `type`
 
-Type: `BlockNameEnumType ` (defined in `block-name-enum-type.php`)
+Type: `BlockNameEnumType ` (defined in `src/types/enums/BlockNameEnumType.php`)
 
 The name of the block. For HTML tags, this is the uppercase version of the HTML tag name, e.g. `P`, `UL`, `BLOCKQUOTE `, `TABLE` etc.. Shortcode and embed BlockNames are name-spaced with `SHORTCODE_` and `EMBED_` respectively., e.g. `SHORTCODE_CAPTION`,  `EMBED_INSTAGRAM ` etc. 
 
-Permissible block names are registered in `BlockDefinitions::$definitions` (`block-definitions.php`). HTML types are specified here manually, embed types are determined by the handlers that have been registered in `$wp_embed->handlers`, and shortcodes are determined by the handlers registered with `$shortcode_tags`. A complete list of permissible block names can seen by browsing the GraphQL schema.
+Permissible block names are registered in `BlockDefinitions::$definitions` (`src/types/shared/BlockDefinitions.php`). HTML types are specified here manually, embed types are determined by the handlers that have been registered in `$wp_embed->handlers`, and shortcodes are determined by the handlers registered with `$shortcode_tags`. A complete list of permissible block names can seen by browsing the GraphQL schema.
 
 ### `innerHtml`
 
@@ -64,7 +64,7 @@ Note that the value of `innerHtml` is the stringified version of all the block�
 
 ### `attributes`
 
-Type: List of`BlockAttributeType` arrays (defined in `block-attribute-type.php`)
+Type: List of`BlockAttributeType` arrays (defined in `src/types/BlockAttributeType.php`)
 
 Each item in the list is an associative array containing a key/value pair for an attribute of the block. For HTML blocks, these are taken from the HTML attributes, e.g.
 
@@ -149,7 +149,7 @@ Because neither shortcode or embed blocks are parsed, the markup for embedding t
 
 We can specify the requirements for individual blocks. This allows us to enforce certain rules about blocks that determine where they end up in the tree, what attributes they may have, and whether or not they should end up in the GraphQL response at all.
 
-Definitions for blocks can be found in `block-definitions.php`.
+Definitions for blocks can be found in `src/types/shared/BlockDefinitions`.  
 
 The default definition for a block is:
 
@@ -225,13 +225,10 @@ Now any `<a>` tag found at the root-level of the post HTML will be wrapped in a 
 ## How parsing works
 Here’s a rough breakdown of the process of parsing post content into blocks:
 
-1. The post content string is prepared for parsing (see `Fields::prepare_html` in `fields.php`). This includes running the `wpautop`, `wptexturize` and `convert_chars` filters.
+1. The post content string is prepared for parsing (see `Fields::prepare_html` in `src/data/Fields.php`). This includes running the `wpautop`, `wptexturize` and `convert_chars` filters.
 2. The prepared content string is loaded into a [PHP DOMDocument](http://php.net/manual/en/class.domdocument.php)) object. This allows us to recurse the HTML as a tree.
-3. The `DOMDocument` object is passed into an `HTMLBlock` (`html-block.php`) object. This begins the process of recursing the tree. Each child block is assigned a class depending on its type: `HTMLBlock`, `TextBlock`, `EmbedBlock` or `ShortcodeBlock`. Each block is responsible for validating itself against the Block Definitions (`block-definitions.php`) to determine whether it belongs in the tree or not.
-4. Although the tree is recursed and validated to an infinite depth, the GraphQL type `BlockType` will stringify the tree below a depth of 1 for consumption in the GraphQL endpoint.
-
-## What about Gutenberg?
-This project is predicated on the ability to switch to using Gutenberg blocks instead of custom parsing, once Gutenberg is released. We look forward to being Gutenberg-compatible!
+3. The `DOMDocument` object is passed into an `HTMLBlock` (`src/parser/class-htmlblock.php`) object. This begins the process of recursing the tree. Each child block is assigned a class depending on its type: `HTMLBlock`, `TextBlock`, `EmbedBlock` or `ShortcodeBlock`. Each block is responsible for validating itself against the Block Definitions (`src/types/shared/BlockDefinitions.php`) to determine whether it belongs in the tree or not.
+4. Although the tree is recursed and validated to an infinite depth, the GraphQL type `BlockType`(`src/types/BlockType.php`) will stringify the tree below a depth of 1 for consumption in the GraphQL endpoint.
 
 ## Examples
 Given a query for the content of a post returns the following:
