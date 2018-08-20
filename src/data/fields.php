@@ -7,6 +7,7 @@
 
 namespace WPGraphQL\Extensions\ContentBlocks\Data;
 
+use WPGraphQL;
 use WPGraphQL\Extensions\ContentBlocks\Parser\HTMLBlock;
 use WPGraphQL\Extensions\ContentBlocks\Types\BlockType;
 use \DOMDocument;
@@ -49,16 +50,27 @@ class Fields {
 	 *
 	 * @var string
 	 */
-	private $version = '0.1.2';
+	private $version = '0.1.8';
 
 	/**
 	 * Add actions and filters.
 	 */
 	public function init() {
-		add_filter( 'graphql_post_fields', array( $this, 'add_fields' ), 10, 1 );
+		add_action( 'do_graphql_request', array( $this, 'add_field_filters' ), 10, 0 );
 		add_filter( 'save_post', array( $this, 'clear_cache' ), 10, 1 );
 
 		$this->enable_cache = apply_filters( 'graphql_blocks_enable_cache', $this->enable_cache );
+	}
+
+	public function add_field_filters() {
+		$post_types = array_filter( WPGraphQL::get_allowed_post_types(), function ( $post_type ) {
+			return post_type_supports( $post_type, 'editor' );
+		} );
+
+		foreach ( $post_types as $post_type ) {
+			$type = get_post_type_object( $post_type )->graphql_single_name;
+			add_filter( "graphql_{$type}_fields", array( $this, 'add_fields' ), 10, 1 );
+		}
 	}
 
 	/**
@@ -189,6 +201,7 @@ class Fields {
 		// Set a default return value.
 		$cache_input = [
 			'blocks'  => [],
+			'date'    => time(),
 			'version' => $this->version,
 		];
 
@@ -199,20 +212,19 @@ class Fields {
 		// We don't want to cache / preserve the entire (very large) tree.
 		if ( null !== $parsed_content ) {
 			$cache_input['blocks'] = array_map( function( $block ) {
-				$parsed_block = [
+				return [
 					'attributes' => $block->get_attributes(),
 					'innerHtml'  => $block->get_inner_html(),
 					'type'       => $block->get_type(),
 				];
-
-				// Allow the output of each block to be filtered in case further
-				// transformation is desired.
-				return apply_filters( 'graphql_blocks_output', $parsed_block, $post );
 			}, $parsed_content->get_children() );
 		}
 
 		// Unset the tree to allow garbage collection.
 		unset( $parsed_content );
+
+		// Allow blocks to be filtered in case further transformation is desired.
+		$cache_input['blocks'] = apply_filters( 'graphql_blocks_output', $cache_input['blocks'], $post );
 
 		// Cache the result even if parsing was unsuccessful (to prevent repeating
 		// any expensive operations).

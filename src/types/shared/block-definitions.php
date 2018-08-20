@@ -318,7 +318,7 @@ class BlockDefinitions {
 					}
 
 					$anchored_regex = self::enforce_regex_anchor( $handler['regex'] );
-					$definitions[ 'embed_' . $tag ] = [
+					$definitions[ self::get_safe_name( 'embed_' . $tag ) ] = [
 						'regex' => [ $anchored_regex ],
 					];
 				}
@@ -343,7 +343,7 @@ class BlockDefinitions {
 				// OEmbed providers aren't really named, so we'll use the endpoint as
 				// the key, effectively grouping oembeds with the same enpoint. The
 				// user can filter the names if they don't like them (and who would).
-				$name = 'embed_' . str_replace( [ '.', '-', '\\' ], '_', preg_replace( '#^https?://#', '', $provider[0] ) );
+				$name = self::get_safe_name( 'embed_' . preg_replace( '#^https?://#', '', $provider[0] ) );
 
 				// If the provider has already been added, just push the regex in.
 				if ( isset( $definitions[ $name ]['regex'] ) ) {
@@ -358,6 +358,23 @@ class BlockDefinitions {
 		}
 
 		return $definitions;
+	}
+
+	/**
+	 * Generate a safe / sanitized name from an enum value.
+	 *
+	 * @param  string $value Enum value.
+	 * @return string
+	 */
+	public static function get_safe_name( $value ) {
+		$safe_name = strtoupper( preg_replace( '#[^A-z0-9]#', '_', $value ) );
+
+		// Enum names must start with a letter or underscore.
+		if ( ! preg_match( '#^[_a-zA-Z]#', $value ) ) {
+			return '_' . $safe_name;
+		}
+
+		return $safe_name;
 	}
 
 	/**

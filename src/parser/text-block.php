@@ -48,7 +48,7 @@ class TextBlock extends Block {
 	 * @return boolean
 	 */
 	public function is_empty() {
-		return 0 === count( $this->get_content() );
+		return empty( $this->get_content() );
 	}
 
 	/**

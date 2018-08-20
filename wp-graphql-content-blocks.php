@@ -4,7 +4,7 @@
  * Plugin URI: https://github.com/Quartz/wp-graphql-content-blocks
  * Description: Parses, validates, and simplifies into blocks in WPGraphQL.
  * Author: James Shakespeare, Chris Zarate, Quartz
- * Version: 0.1.2
+ * Version: 0.1.8
  * Author URI: https://qz.com/
  *
  * @package WPGraphQL Content Blocks

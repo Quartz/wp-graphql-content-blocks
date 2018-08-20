@@ -22,23 +22,6 @@ class BlockNameEnumType {
 	private static $type;
 
 	/**
-	 * Generate a safe / sanitized name from an enum value.
-	 *
-	 * @param  string $value Enum value.
-	 * @return string
-	 */
-	private static function get_safe_name( $value ) {
-		$safe_name = strtoupper( preg_replace( '#[^A-z0-9]#', '_', $value ) );
-
-		// Enum names must start with a letter or underscore.
-		if ( ! preg_match( '#^[_a-zA-Z]#', $value ) ) {
-			return '_' . $safe_name;
-		}
-
-		return $safe_name;
-	}
-
-	/**
 	 * Create type definition.
 	 *
 	 * @return WPEnumType
@@ -50,7 +33,7 @@ class BlockNameEnumType {
 
 		$values = [];
 		foreach ( BlockDefinitions::get_root_blocks() as $block ) {
-			$values[ self::get_safe_name( $block['name'] ) ] = [
+			$values[ BlockDefinitions::get_safe_name( $block['name'] ) ] = [
 				'value' => $block['name'],
 			];
 		}

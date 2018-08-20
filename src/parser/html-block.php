@@ -58,6 +58,24 @@ class HTMLBlock extends Block {
 	}
 
 	/**
+	 * Tests the given string against all shortcode regexes. Returns the name of the first
+	 * matching embed.
+	 *
+	 * @param  string $content The string to check against the embed regexes
+	 * @return string|bool $name|false The embed type that matched against the string, or false if not matches
+	 **/
+	public function find_embed_match( $content ) {
+		foreach ( BlockDefinitions::get_blocks( 'embed' ) as $name => $embed ) {
+			foreach ( $embed['regex'] as $regex ) {
+				if ( preg_match( $regex, $content ) ) {
+					return $name;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Split this node's text content into shortcodes and text blocks.
 	 *
 	 * @param  string $html  This node's text content.
@@ -69,64 +87,113 @@ class HTMLBlock extends Block {
 		// First look for embeds. We expect them to be the only child of a p block
 		// (https://codex.wordpress.org/Embeds).
 		if ( 'p' === $this->get_parent()->get_type() && ! $this->has_siblings() ) {
-			foreach ( BlockDefinitions::get_blocks( 'embed' ) as $name => $embed ) {
-				foreach ( $embed['regex'] as $regex ) {
-					if ( preg_match( $regex, $trimmed_content ) ) {
-						return [
-							[
-								'attributes'  => [
-									'url'      => $trimmed_content,
-								],
-								'block_class' => 'EmbedBlock',
-								'parent'      => $this,
-								'type'        => $name,
-								'raw'         => $trimmed_content,
-							],
-						];
-					}
-				}
+			$embed_name = self::find_embed_match( $trimmed_content );
+			if ( $embed_name ) {
+				return [
+					[
+						'attributes'  => [
+							 'url'       => $trimmed_content,
+						],
+						'block_class' => 'EmbedBlock',
+						'parent'      => $this,
+						'type'        => $embed_name,
+						'raw'         => $trimmed_content,
+					],
+				];
 			}
 		}
 
-		$return          = [];
-		$shortcode_regex = get_shortcode_regex();
-		$pattern         = '/' . $shortcode_regex . '/s';
+		// Stealing some core.
+		// https://core.trac.wordpress.org/browser/tags/4.9/src/wp-includes/shortcodes.php#L228
+		$shortcode_regex =
+			'\\['								// Opening bracket
+			. '(\\[?)'						// 1: Optional second opening bracket for escaping shortcodes: [[tag]]
+			. '([\\w-]+)'					// 2: Shortcode name
+			. '(?![\\w-])'					// Not followed by word character or hyphen
+			. '('								// 3: Unroll the loop: Inside the opening shortcode tag
+			.	'[^\\]\\/]*'				// Not a closing bracket or forward slash
+			.	'(?:'
+			.		'\\/(?!\\])'			// A forward slash not followed by a closing bracket
+			.		'[^\\]\\/]*'			// Not a closing bracket or forward slash
+			.	')*?'
+			. ')'
+			. '(?:'
+			.	'(\\/)'						// 4: Self closing tag ...
+			.	'\\]'						// ... and closing bracket
+			. '|'
+			.	'\\]'						// Closing bracket
+			.	'(?:'
+			.		'('						// 5: Unroll the loop: Optionally, anything between the opening and closing shortcode tags
+			.			'[^\\[]*+'			// Not an opening bracket
+			.			'(?:'
+			.				'\\[(?!\\/\\2\\])' // An opening bracket not followed by the closing shortcode tag
+			.				'[^\\[]*+'		// Not an opening bracket
+			.			')*+'
+			.		')'
+			.		'\\[\\/\\2\\]'			// Closing shortcode tag
+			.	')?'
+			. ')'
+			. '(\\]?)';						// 6: Optional second closing brocket for escaping shortcodes: [[tag]]
+
+		$return		= [];
+		$pattern		= '/' . $shortcode_regex . '/s';
 		$has_shortcodes  = preg_match_all( $pattern, $html, $matches );
+		$shortcode_definitions = BlockDefinitions::get_blocks( 'shortcode' );
 
 		if ( $has_shortcodes ) {
+
 			// Create an array of the text between shortcodes.
 			$remaining_text = preg_split( $pattern, $html );
 
 			// Create our return array by zipping remaining text and shortcodes.
 			foreach ( $remaining_text as $index => $text ) {
-				$trimmed = trim( $text );
+				$has_match = $index < count( $matches[0] );
+				$raw_text = $has_match ? $matches[0][ $index ] : '';
+				$shortcode_name = $has_match ? 'shortcode_' . $matches[2][ $index ] : false;
+				$is_valid_shortcode = isset( $shortcode_definitions[ $shortcode_name ] );
 
-				// For each iteration push a piece of surrounding text to the return array.
-				if ( $trimmed ) {
-					$return[] = [
-						'block_class' => 'TextBlock',
-						'content'     => $text,
-						'parent'      => $this,
-					];
+				// If it's not a registered shortcode, append it as text to the
+				// previous text block. This preserves regular [bracketed] text.
+				$leading_text = $is_valid_shortcode ? $text : $text . $raw_text;
+
+				// For each iteration push the leading text to the return array.
+				$text_block = [
+					'block_class' => 'TextBlock',
+					'content'     => $leading_text,
+					'parent'      => $this,
+				];
+
+				// Only add the text block if the leading text is non-empty.
+				if ( trim( $leading_text ) ) {
+					$return[] = $text_block;
 				}
 
 				// Then push a shortcode from our $matches array.
-				if ( $index < count( $matches[0] ) ) {
+				if ( $has_match && $is_valid_shortcode ) {
 					// These indices are based on Wordpreß' shortcode regex groups.
 					$block = [
 						'attributes'  => shortcode_parse_atts( $matches[3][ $index ] ),
 						'block_class' => 'ShortcodeBlock',
 						'content'     => $matches[5][ $index ],
 						'parent'      => $this,
-						'type'        => 'shortcode_' . $matches[2][ $index ],
-						'raw'         => $matches[0][ $index ],
+						'type'        => $shortcode_name,
+						'raw'         => $raw_text,
 					];
 
 					// Embed shortcode is a special kind of embed.
-					if ( 'embed' === $block['type'] ) {
-						$block['attributes']['url'] = $block['content'];
-						$block['block_class'] = 'EmbedBlock';
-						$block['type'] = 'embed';
+					if ( 'shortcode_embed' === $block['type'] ) {
+						$embed_name = self::find_embed_match( $block['content'] );
+						if ( $embed_name ) {
+							$block = [
+								'attributes'  => [
+									'url'       => $block['content'],
+								],
+								'block_class' => 'EmbedBlock',
+								'parent'      => $this,
+								'type'        => $embed_name,
+								'raw'         => $block['content'],
+							];
+						}
 						unset( $block['content'] );
 					}
 
@@ -195,7 +262,6 @@ class HTMLBlock extends Block {
 
 			foreach ( $child_args as $child ) {
 				$child_block = $this->create_block( $child['block_class'], $child );
-
 				// Hoist root-only blocks to the top.
 				if ( $child_block->validator->is_root_only() ) {
 					$this->hoist_to_root( $child_block );
