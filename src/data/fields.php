@@ -8,9 +8,9 @@
 namespace WPGraphQL\Extensions\ContentBlocks\Data;
 
 use WPGraphQL;
-use WPGraphQL\Extensions\ContentBlocks\Parser\HTMLBlock;
+use WPGraphQL\Extensions\ContentBlocks\Parser\GutenbergBlock;
 use WPGraphQL\Extensions\ContentBlocks\Types\BlockType;
-use \DOMDocument;
+use function WPGraphQL\Extensions\ContentBlocks\Parser\create_root_block;
 
 /**
  * Content blocks field for WPGraphQL
@@ -50,16 +50,15 @@ class Fields {
 	 *
 	 * @var string
 	 */
-	private $version = '0.1.8';
+	private $version = '0.4.0';
 
 	/**
 	 * Add actions and filters.
 	 */
 	public function init() {
 		add_action( 'do_graphql_request', array( $this, 'add_field_filters' ), 10, 0 );
+		add_action( 'do_graphql_request', array( $this, 'update_settings' ), 10, 0 );
 		add_filter( 'save_post', array( $this, 'clear_cache' ), 10, 1 );
-
-		$this->enable_cache = apply_filters( 'graphql_blocks_enable_cache', $this->enable_cache );
 	}
 
 	public function add_field_filters() {
@@ -71,6 +70,24 @@ class Fields {
 			$type = get_post_type_object( $post_type )->graphql_single_name;
 			add_filter( "graphql_{$type}_fields", array( $this, 'add_fields' ), 10, 1 );
 		}
+	}
+
+	public function update_settings() {
+		// Whether to enable caching in post meta.
+		//
+		// @param bool Whether cache should be enabled.
+		// @since 0.1.0
+		$this->enable_cache = boolval( apply_filters( 'graphql_blocks_enable_cache', $this->enable_cache ) );
+
+		// Get a filtered plugin "user" version. We will combine our version and
+		// the user's into a semver with patch (though we don't validate it in any
+		// way, it's just a string). This lets both the plugin and the user bust
+		// cache independently.
+		//
+		// @param string Version string
+		// @since 0.2.0
+		$user_version = strval( apply_filters( 'graphql_blocks_version', '1' ) );
+		$this->version = "{$this->version}-{$user_version}";
 	}
 
 	/**
@@ -133,13 +150,15 @@ class Fields {
 	 * @return string $decoded_html The formatted HTML
 	 **/
 	private function prepare_html( $html ) {
+		// Strip HTML comments.
+		$html = preg_replace( '/(?=<!--)([\s\S]*?)-->/is', '', $html );
+
 		// Run a subset of the_content filters on the text.
-		$html = wpautop( wptexturize( $html ) );
-		$decoded_html = trim( apply_filters( 'convert_chars', $html ) );
+		$html = trim( apply_filters( 'convert_chars', wpautop( $html ) ) );
 
 		// Remove any remaining linebreaks now that we have been converted to HTML
 		// (leaving them in will result in the creation of empty text nodes).
-		$decoded_html = preg_replace( '/\n/', '', $decoded_html );
+		$html = preg_replace( '/\n/', '', $html );
 
 		// Escape HTML inside shortcode tags. This prevents DOMDocument from splitting
 		// shortcode contents into separate nodes. We can unescape the HTML if we need
@@ -148,41 +167,65 @@ class Fields {
 		$pattern = '/' . $shortcode_regex . '/s';
 		return preg_replace_callback( $pattern, function( $matches ) {
 			return htmlspecialchars( $matches[0] );
-		}, $decoded_html );
+		}, $html );
 	}
 
 	/**
 	 * Parse the content of a post and return blocks.
-	 * This will:
-	 * - Prepare the HTML for parsing (see Fields::prepare_html)
-	 * - Instantiate a DOMDocument object
-	 * - Pass the DOMDocument object into a new HTMLBlock object. This
-	 *   will begin the process of recursively parsing the HTML tree
-	 * - Return the HTMLBlock object
 	 *
 	 * @param  WP_Post $post Post to parse.
 	 * @return array|null
 	 */
 	private function parse_post_content( $post ) {
+		// Prepare the HTML for parsing.
 		$html = $this->prepare_html( $post->post_content );
 		if ( empty( $html ) ) {
 			return null;
 		}
 
-		// Create a DOM parser that we can walk with our Block classes.
-		$doc = new DOMDocument;
-		$doc->preserveWhiteSpace = false;
-		libxml_use_internal_errors( true );
-
-		// Load the HTML into the DOMDocument. Include the UTF-8 encoding
-		// declaration. Suppress errors because DOMDocument doesn't recognize
-		// HTML5 tags as valid -_-.
-		if ( $doc->loadHTML( '<?xml encoding="utf-8" ?>' . $html ) ) {
-			return new HTMLBlock( null, $doc, 'root' );
+		$root_block = create_root_block( $html );
+		if ( $root_block ) {
+			return $root_block->get_children();
 		}
 
 		$this->log_error( $post );
 		return null;
+	}
+
+	/**
+	 * Parse the Gutenberg blocks of a post and return our flavor of blocks.
+	 *
+	 * @param  WP_Post $post Post to parse.
+	 * @return array|null
+	 */
+	private function parse_post_gutenberg_blocks( $post ) {
+		// Check for Gutenberg functions (these could change before release).
+		if ( ! function_exists( 'has_blocks' ) || ! function_exists( 'gutenberg_parse_blocks' ) ) {
+			return null;
+		}
+
+		// Check if the post has Gutenberg blocks. This is just a regex on
+		// post_content under the hood. Fun, right?
+		if ( ! has_blocks( $post ) ) {
+			return null;
+		}
+
+		// Use Gutenberg's function to parse the blocks. The function often returns
+		// empty "spacer" blocks because ... well, I don't know why. Remove them.
+		$blocks = array_filter( gutenberg_parse_blocks( $post->post_content ), function ( $block ) {
+			return ! empty( $block['blockName'] );
+		} );
+
+		// Pass to our class that will extract internals we want.
+		$blocks = array_map( function ( $block ) {
+			return new GutenbergBlock( $block );
+		}, $blocks );
+
+		// Because this isn't HTML, we don't have a single block at the apex that
+		// performs validation of its children. Check validity manually.
+		return array_filter( $blocks, function ( $block ) {
+			return $block->validator->is_valid();
+		} );
 	}
 
 	/**
@@ -205,25 +248,38 @@ class Fields {
 			'version' => $this->version,
 		];
 
-		// This is where the magic happens.
-		$parsed_content = $this->parse_post_content( $post );
+		// First, check to see if the post has Gutenberg blocks.
+		$blocks = $this->parse_post_gutenberg_blocks( $post );
+
+		// If that failed (post does not support Gutenberg, Gutenberg is not
+		// installed, etc.), then fire up the DOMDocument chainsaw.
+		if ( ! is_array( $blocks ) ) {
+			$blocks = $this->parse_post_content( $post );
+		}
 
 		// If the parsing was successful, create a representation of the "blocks."
 		// We don't want to cache / preserve the entire (very large) tree.
-		if ( null !== $parsed_content ) {
+		if ( is_array( $blocks ) ) {
 			$cache_input['blocks'] = array_map( function( $block ) {
 				return [
-					'attributes' => $block->get_attributes(),
-					'innerHtml'  => $block->get_inner_html(),
-					'type'       => $block->get_type(),
+					'attributes'     => $block->get_attributes(),
+					'attributes_raw' => $block->get_raw_attributes(), // This will not be represented in GraphQL output.
+					'connections'    => array(), // User must filter and implement this themselves.
+					'innerHtml'      => $block->get_inner_html(),
+					'tagName'        => $block->get_tag_name(),
+					'type'           => $block->get_type(),
 				];
-			}, $parsed_content->get_children() );
+			}, $blocks );
 		}
 
 		// Unset the tree to allow garbage collection.
-		unset( $parsed_content );
+		unset( $blocks );
 
 		// Allow blocks to be filtered in case further transformation is desired.
+		//
+		// @param array   Array of blocks
+		// @param WP_Post WP post object
+		// @since 0.1.8
 		$cache_input['blocks'] = apply_filters( 'graphql_blocks_output', $cache_input['blocks'], $post );
 
 		// Cache the result even if parsing was unsuccessful (to prevent repeating

@@ -50,8 +50,6 @@ class ShortcodeBlock extends Block {
 			] );
 			$this->add_child( $block );
 		}
-
-		return $this->get_children();
 	}
 
 	/**

@@ -22,7 +22,8 @@ class BlockDefinitions {
 		'allow_empty' => false,
 
 		'attributes'  => [
-			// An array of attributes to allow. All other attributes are removed.
+			// An array of attributes to allow. If defined, all other attributes are
+			// removed.
 			'allow'    => null,
 
 			// An array of attributes to remove (blacklist). All other attributes
@@ -58,10 +59,85 @@ class BlockDefinitions {
 	/**
 	 * Block definitions (extended by defaults).
 	 *
+	 * NOTE: There is no server-side registration of Gutenberg blocks, so
+	 * unfortunately we will just hardcode a list of the known block types and
+	 * try to keep it up to date. Users and plugins will need to filter
+	 * definitions to add non-core blocks. This is a HUGE issue with Gutenberg:
+	 *
+	 * https://github.com/WordPress/gutenberg/issues/2751
+	 *
 	 * @var array
 	 */
 	private static $definitions = [
 		'embed' => [],
+		'gutenberg' => [
+			'core/paragraph' => [],
+			'core/image' => [],
+			'core/heading' => [],
+			'core/gallery' => [],
+			'core/list' => [],
+			'core/quote' => [],
+			'core/shortcode' => [],
+			'core/archives' => [],
+			'core/audio' => [],
+			'core/button' => [],
+			'core/categories' => [],
+			'core/code' => [],
+			'core/columns' => [],
+			'core/column' => [],
+			'core/cover-image' => [],
+			'core/embed' => [],
+			'core-embed/twitter' => [],
+			'core-embed/youtube' => [],
+			'core-embed/facebook' => [],
+			'core-embed/instagram' => [],
+			'core-embed/wordpress' => [],
+			'core-embed/soundcloud' => [],
+			'core-embed/spotify' => [],
+			'core-embed/flickr' => [],
+			'core-embed/vimeo' => [],
+			'core-embed/animoto' => [],
+			'core-embed/cloudup' => [],
+			'core-embed/collegehumor' => [],
+			'core-embed/dailymotion' => [],
+			'core-embed/funnyordie' => [],
+			'core-embed/hulu' => [],
+			'core-embed/imgur' => [],
+			'core-embed/issuu' => [],
+			'core-embed/kickstarter' => [],
+			'core-embed/meetup-com' => [],
+			'core-embed/mixcloud' => [],
+			'core-embed/photobucket' => [],
+			'core-embed/polldaddy' => [],
+			'core-embed/reddit' => [],
+			'core-embed/reverbnation' => [],
+			'core-embed/screencast' => [],
+			'core-embed/scribd' => [],
+			'core-embed/slideshare' => [],
+			'core-embed/smugmug' => [],
+			'core-embed/speaker' => [],
+			'core-embed/ted' => [],
+			'core-embed/tumblr' => [],
+			'core-embed/videopress' => [],
+			'core-embed/wordpress-tv' => [],
+			'core/file' => [],
+			'core/freeform' => [],
+			'core/html' => [],
+			'core/latest-comments' => [],
+			'core/latest-posts' => [],
+			'core/more' => [],
+			'core/nextpage' => [],
+			'core/preformatted' => [],
+			'core/pullquote' => [],
+			'core/separator' => [],
+			'core/block' => [],
+			'core/spacer' => [],
+			'core/subhead' => [],
+			'core/table' => [],
+			'core/text-columns' => [],
+			'core/verse' => [],
+			'core/video' => [],
+		],
 		'html' => [
 			'blockquote' => [],
 			'figure' => [],
@@ -216,6 +292,9 @@ class BlockDefinitions {
 		self::$definitions['shortcode'] = self::get_shortcode_definitions();
 
 		// Allow user to extend / modify the block definitions.
+		//
+		// @param array Definitions array
+		// @since 0.1.0
 		self::$definitions = apply_filters( 'graphql_blocks_definitions', self::$definitions );
 
 		// Extend each block definition with the defaults.
@@ -229,7 +308,7 @@ class BlockDefinitions {
 	/**
 	 * Has a block been defined with the block and node type names?
 	 *
-	 * @param  string $block_type 'html' or 'shortcode'.
+	 * @param  string $block_type 'embed', 'gutenberg', 'html', or 'shortcode'.
 	 * @param  string $node_type  The string representation of the node name (e.g., tag name).
 	 * @return array  $definition The block's definition
 	 */

@@ -21,6 +21,13 @@ class Block {
 	private $attributes;
 
 	/**
+	 * Raw attributes (can be parsed by the plugin user)
+	 *
+	 * @var array
+	 */
+	private $attributes_raw;
+
+	/**
 	 * Stringified inner HTML of the block
 	 *
 	 * @var string
@@ -34,6 +41,14 @@ class Block {
 	 * @var string
 	 */
 	private $type;
+
+	/**
+	 * The Block's tag name, in case it differs from the block name (or to give
+	 * guidance to the Block implementor).
+	 *
+	 * @var string
+	 */
+	private $tag_name;
 
 	/**
 	 * Block object in which this Block appears in the children array
@@ -122,6 +137,16 @@ class Block {
 	}
 
 	/**
+	 * Get the block's raw attributes. This is useful in post-validation
+	 * filtering.
+	 *
+	 * @return array
+	 **/
+	public function get_raw_attributes() {
+		return is_array( $this->attributes_raw ) ? $this->attributes_raw : [];
+	}
+
+	/**
 	 * Get the block's content.
 	 *
 	 * @return string
@@ -168,6 +193,19 @@ class Block {
 	}
 
 	/**
+	 * Get the block's tag name.
+	 *
+	 * @return string
+	 */
+	public function get_tag_name() {
+		if ( 'html' === $this->get_block_type() ) {
+			return $this->type;
+		}
+
+		return $this->tag_name;
+	}
+
+	/**
 	 * Recursively stringify this block's children.
 	 *
 	 * @return string
@@ -189,7 +227,8 @@ class Block {
 		// Remove shortcode filter.
 		remove_filter( 'pre_do_shortcode_tag', array( $this, 'unescape_shortcode_content' ), 10 );
 
-		return html_entity_decode( $inner_html, ENT_QUOTES );
+		// Texturize and decode entities.
+		return html_entity_decode( wptexturize( $inner_html ), ENT_QUOTES );
 	}
 
 	/**
@@ -199,11 +238,12 @@ class Block {
 	 */
 	public function set_attributes( $attributes ) {
 		if ( empty( $attributes ) ) {
-			$this->attributes = [];
+			$this->attributes = $this->attributes_raw = [];
 			return;
 		}
 
 		$this->attributes = $this->validator->filter_attributes( $attributes );
+		$this->attributes_raw = $attributes;
 	}
 
 	/**
@@ -222,6 +262,15 @@ class Block {
 	 */
 	public function set_parent( $parent ) {
 		$this->parent = $parent;
+	}
+
+	/**
+	 * Set the block's tag name.
+	 *
+	 * @param string $type Block node type.
+	 */
+	public function set_tag_name( $tag_name ) {
+		$this->tag_name = $tag_name;
 	}
 
 	/**

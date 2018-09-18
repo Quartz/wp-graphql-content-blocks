@@ -275,8 +275,6 @@ class HTMLBlock extends Block {
 
 		// Set the attributes once on parse.
 		$this->set_attributes( $this->get_attributes_from_node() );
-
-		return $this->get_children();
 	}
 
 	/**
@@ -316,4 +314,30 @@ class HTMLBlock extends Block {
 
 		return $node;
 	}
+}
+
+/**
+ * Parse an HTML string an create a root-level HTMLBlock.
+ * - Instantiate a DOMDocument object
+ * - Pass the DOMDocument object into a new HTMLBlock object. This
+ *   will begin the process of recursively parsing the HTML tree
+ * - Return the HTMLBlock object
+ *
+ * @param  string $html HTML string
+ * @return HTMLBlock
+ */
+function create_root_block( $html ) {
+	// Create a DOM parser that we can walk with our Block classes.
+	$doc = new \DOMDocument;
+	$doc->preserveWhiteSpace = false;
+	\libxml_use_internal_errors( true );
+
+	// Load the HTML into the DOMDocument. Include the UTF-8 encoding
+	// declaration. Suppress errors because DOMDocument doesn't recognize
+	// HTML5 tags as valid -_-.
+	if ( $doc->loadHTML( '<?xml encoding="utf-8" ?>' . $html ) ) {
+		return new HTMLBlock( null, $doc, 'root' );
+	}
+
+	return null;
 }

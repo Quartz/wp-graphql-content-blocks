@@ -191,6 +191,11 @@ class Validator {
 	 * @return array
 	 */
 	public function filter_attributes( $attributes ) {
+		// Attribute values must be strings or null.
+		$attributes = array_filter( $attributes, function( $attribute ) {
+			return is_string( $attribute ) || is_null( $attribute );
+		} );
+
 		// If there are no attribute rules to work with, give all the attributes back.
 		if ( ! isset( $this->definition['attributes'] ) ) {
 			return $attributes;
