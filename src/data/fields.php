@@ -7,7 +7,9 @@
 
 namespace WPGraphQL\Extensions\ContentBlocks\Data;
 
+use GraphQL\Type\Definition\ResolveInfo;
 use WPGraphQL;
+use WPGraphQL\AppContext;
 use WPGraphQL\Extensions\ContentBlocks\Parser\GutenbergBlock;
 use WPGraphQL\Extensions\ContentBlocks\Types\BlockType;
 use function WPGraphQL\Extensions\ContentBlocks\Parser\create_root_block;
@@ -50,14 +52,14 @@ class Fields {
 	 *
 	 * @var string
 	 */
-	private $version = '0.4.0';
+	private $version = '0.5.0';
 
 	/**
 	 * Add actions and filters.
 	 */
 	public function init() {
-		add_action( 'do_graphql_request', array( $this, 'add_field_filters' ), 10, 0 );
-		add_action( 'do_graphql_request', array( $this, 'update_settings' ), 10, 0 );
+		add_action( 'graphql_get_schema', array( $this, 'add_field_filters' ), 10, 0 );
+		add_action( 'graphql_init', array( $this, 'update_settings' ), 10, 0 );
 		add_filter( 'save_post', array( $this, 'clear_cache' ), 10, 1 );
 	}
 
@@ -199,8 +201,8 @@ class Fields {
 	 * @return array|null
 	 */
 	private function parse_post_gutenberg_blocks( $post ) {
-		// Check for Gutenberg functions (these could change before release).
-		if ( ! function_exists( 'has_blocks' ) || ! function_exists( 'gutenberg_parse_blocks' ) ) {
+		// Check for Gutenberg functionality.
+		if ( ! function_exists( 'has_blocks' ) ) {
 			return null;
 		}
 
@@ -212,7 +214,7 @@ class Fields {
 
 		// Use Gutenberg's function to parse the blocks. The function often returns
 		// empty "spacer" blocks because ... well, I don't know why. Remove them.
-		$blocks = array_filter( gutenberg_parse_blocks( $post->post_content ), function ( $block ) {
+		$blocks = array_filter( $this->gutenberg_parse_blocks( $post->post_content ), function ( $block ) {
 			return ! empty( $block['blockName'] );
 		} );
 
@@ -229,12 +231,42 @@ class Fields {
 	}
 
 	/**
-	 * Resolver for content blocks.
+	 * Parses blocks out of a content string.
 	 *
-	 * @param  WP_Post $post Post to parse content blocks for.
+	 * During pre-core-Gutenberg times, this was an access function available to
+	 * everyone. It was removed for some reason in core. Copying from:
+	 * https://github.com/WordPress/gutenberg/blob/master/lib/blocks.php
+	 *
+	 * @param  string $content Post content.
+	 * @return array  Array of parsed block objects.
+	 */
+	private function gutenberg_parse_blocks( $content ) {
+		/**
+		 * Filter to allow plugins to replace the server-side block parser
+		 *
+		 * @param string $parser_class Name of block parser class
+		 */
+		$parser_class = apply_filters( 'block_parser_class', 'WP_Block_Parser' );
+
+		if ( ! class_exists( $parser_class ) ) {
+			return array();
+		}
+
+		$parser = new $parser_class();
+
+		return $parser->parse( $content );
+	}
+
+	/**
+	 * Get content blocks for a post.
+	 *
+	 * @param  \WP_Post    $post    Post to parse content blocks for.
+	 * @param  array       $args    Array of query args.
+	 * @param  AppContext  $context Request context.
+	 * @param  ResolveInfo $info    Information about field resolution.
 	 * @return array|null
 	 */
-	public function resolve( $post ) {
+	private function get_blocks_for_post( \WP_Post $post, $args, AppContext $context, ResolveInfo $info ) {
 		// First check for cached blocks.
 		$cache = get_post_meta( $post->ID, $this->post_meta_field, true );
 		if ( $this->enable_cache && isset( $cache['version'] ) && $this->version === $cache['version'] ) {
@@ -276,11 +308,15 @@ class Fields {
 		unset( $blocks );
 
 		// Allow blocks to be filtered in case further transformation is desired.
+		// Results of this operation will be cached.
 		//
-		// @param array   Array of blocks
-		// @param WP_Post WP post object
+		// @param array       Array of blocks
+		// @param WP_Post     WP post object
+		// @param array       Array of query args
+		// @param AppContext  Request context
+		// @param ResolveInfo Information about field resolution
 		// @since 0.1.8
-		$cache_input['blocks'] = apply_filters( 'graphql_blocks_output', $cache_input['blocks'], $post );
+		$cache_input['blocks'] = apply_filters( 'graphql_blocks_output', $cache_input['blocks'], $post, $args, $context, $info );
 
 		// Cache the result even if parsing was unsuccessful (to prevent repeating
 		// any expensive operations).
@@ -289,5 +325,33 @@ class Fields {
 		}
 
 		return $cache_input['blocks'];
+	}
+
+	/**
+	 * Resolver for content blocks.
+	 *
+	 * @param  \WP_Post    $post    Post to parse content blocks for.
+	 * @param  array       $args    Array of query args.
+	 * @param  AppContext  $context Request context.
+	 * @param  ResolveInfo $info    Information about field resolution.
+	 * @return array|null
+	 */
+	public function resolve( \WP_Post $post, $args, AppContext $context, ResolveInfo $info ) {
+		$blocks = $this->get_blocks_for_post( $post, $args, $context, $info );
+
+		// Allow cached blocks to be filtered to allow runtime decisions.
+		//
+		// WARNING: This filter will run every time the blocks field is
+		// resolved and should only be used when the operation is not cacheable
+		// (e.g., an authorization check). Otherwise, use graphql_blocks_output
+		// to take advantage of caching.
+		//
+		// @param array       Array of blocks
+		// @param WP_Post     WP post object
+		// @param array       Array of query args
+		// @param AppContext  Request context
+		// @param ResolveInfo Information about field resolution
+		// @since 0.5.0
+		return apply_filters( 'graphql_blocks_cached_output', $blocks, $post, $args, $context, $info );
 	}
 }

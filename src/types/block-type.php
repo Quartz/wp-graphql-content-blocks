@@ -75,13 +75,11 @@ class BlockType {
 						// can sift through the attributes to determine if anything
 						// needs to be connected.
 						//
-						// The MenuItemObjectUnion contains every GraphQL type that
-						// we're interested in, so we'll use that. This tells me that we
-						// should probably rename it upstream since it's useful for more
-						// than just menu items (it's really a union of all core WP data
-						// types—post types, taxonomies, users).
+						// The PostObjectUnion contains every GraphQL type that we're
+						// interested in, so we'll use that. We need to find a better home
+						// for this.
 						'connections' => [
-							'type'        => Types::list_of( Types::menu_item_object_union() ),
+							'type'        => Types::list_of( Types::post_object_union() ),
 							'description' => 'Objects connected to this block',
 						],
 						'innerHtml' => [
