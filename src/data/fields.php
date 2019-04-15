@@ -59,8 +59,9 @@ class Fields {
 	 */
 	public function init() {
 		add_action( 'graphql_get_schema', array( $this, 'add_field_filters' ), 10, 0 );
-		add_action( 'graphql_init', array( $this, 'update_settings' ), 10, 0 );
 		add_filter( 'save_post', array( $this, 'clear_cache' ), 10, 1 );
+
+		$this->update_settings();
 	}
 
 	public function add_field_filters() {
@@ -180,7 +181,7 @@ class Fields {
 	 */
 	private function parse_post_content( $post ) {
 		// Prepare the HTML for parsing.
-		$html = $this->prepare_html( $post->post_content );
+		$html = $this->prepare_html( $post->contentRaw );
 		if ( empty( $html ) ) {
 			return null;
 		}
@@ -197,10 +198,10 @@ class Fields {
 	/**
 	 * Parse the Gutenberg blocks of a post and return our flavor of blocks.
 	 *
-	 * @param  WP_Post $post Post to parse.
+	 * @param  \WPGraphQL\Model\Post $post Post to parse.
 	 * @return array|null
 	 */
-	private function parse_post_gutenberg_blocks( $post ) {
+	private function parse_post_gutenberg_blocks( \WPGraphQL\Model\Post $post ) {
 		// Check for Gutenberg functionality.
 		if ( ! function_exists( 'has_blocks' ) ) {
 			return null;
@@ -208,13 +209,13 @@ class Fields {
 
 		// Check if the post has Gutenberg blocks. This is just a regex on
 		// post_content under the hood. Fun, right?
-		if ( ! has_blocks( $post ) ) {
+		if ( ! has_blocks( $post->ID ) ) {
 			return null;
 		}
 
 		// Use Gutenberg's function to parse the blocks. The function often returns
 		// empty "spacer" blocks because ... well, I don't know why. Remove them.
-		$blocks = array_filter( $this->gutenberg_parse_blocks( $post->post_content ), function ( $block ) {
+		$blocks = array_filter( $this->gutenberg_parse_blocks( $post->contentRaw ), function ( $block ) {
 			return ! empty( $block['blockName'] );
 		} );
 
@@ -260,13 +261,13 @@ class Fields {
 	/**
 	 * Get content blocks for a post.
 	 *
-	 * @param  \WP_Post    $post    Post to parse content blocks for.
+	 * @param  \WPGraphQL\Model\Post    $post    Post to parse content blocks for.
 	 * @param  array       $args    Array of query args.
 	 * @param  AppContext  $context Request context.
 	 * @param  ResolveInfo $info    Information about field resolution.
 	 * @return array|null
 	 */
-	private function get_blocks_for_post( \WP_Post $post, $args, AppContext $context, ResolveInfo $info ) {
+	private function get_blocks_for_post( \WPGraphQL\Model\Post $post, $args, AppContext $context, ResolveInfo $info ) {
 		// First check for cached blocks.
 		$cache = get_post_meta( $post->ID, $this->post_meta_field, true );
 		if ( $this->enable_cache && isset( $cache['version'] ) && $this->version === $cache['version'] ) {
@@ -330,13 +331,13 @@ class Fields {
 	/**
 	 * Resolver for content blocks.
 	 *
-	 * @param  \WP_Post    $post    Post to parse content blocks for.
+	 * @param  \WPGraphQL\Model\Post    $post    Post to parse content blocks for.
 	 * @param  array       $args    Array of query args.
 	 * @param  AppContext  $context Request context.
 	 * @param  ResolveInfo $info    Information about field resolution.
 	 * @return array|null
 	 */
-	public function resolve( \WP_Post $post, $args, AppContext $context, ResolveInfo $info ) {
+	public function resolve( \WPGraphQL\Model\Post $post, $args, AppContext $context, ResolveInfo $info ) {
 		$blocks = $this->get_blocks_for_post( $post, $args, $context, $info );
 
 		// Allow cached blocks to be filtered to allow runtime decisions.
@@ -346,11 +347,11 @@ class Fields {
 		// (e.g., an authorization check). Otherwise, use graphql_blocks_output
 		// to take advantage of caching.
 		//
-		// @param array       Array of blocks
-		// @param WP_Post     WP post object
-		// @param array       Array of query args
-		// @param AppContext  Request context
-		// @param ResolveInfo Information about field resolution
+		// @param array       			Array of blocks
+		// @param \WPGraphQL\Model\Post \WPGraphQL\Model\Post post object
+		// @param array       			Array of query args
+		// @param AppContext  			Request context
+		// @param ResolveInfo 		Information about field resolution
 		// @since 0.5.0
 		return apply_filters( 'graphql_blocks_cached_output', $blocks, $post, $args, $context, $info );
 	}
