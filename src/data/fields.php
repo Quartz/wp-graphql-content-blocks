@@ -59,8 +59,9 @@ class Fields {
 	 */
 	public function init() {
 		add_action( 'graphql_get_schema', array( $this, 'add_field_filters' ), 10, 0 );
-		add_action( 'graphql_init', array( $this, 'update_settings' ), 10, 0 );
 		add_filter( 'save_post', array( $this, 'clear_cache' ), 10, 1 );
+
+		$this->update_settings();
 	}
 
 	public function add_field_filters() {
