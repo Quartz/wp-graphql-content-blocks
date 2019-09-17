@@ -331,13 +331,22 @@ class Fields {
 	/**
 	 * Resolver for content blocks.
 	 *
-	 * @param  \WP_Post    $post    Post to parse content blocks for.
+	 * @param  mixed       $post    Post to parse content blocks for. Can be
+	 *                              WP_Post or WPGraphQL\Model\Post.
 	 * @param  array       $args    Array of query args.
 	 * @param  AppContext  $context Request context.
 	 * @param  ResolveInfo $info    Information about field resolution.
 	 * @return array|null
 	 */
-	public function resolve( \WP_Post $post, $args, AppContext $context, ResolveInfo $info ) {
+	public function resolve( $post, $args, AppContext $context, ResolveInfo $info ) {
+		// WPGraphQL introduced a model layer that attempts to respect WordPress
+		// caps and restricts access to some fields. One of those fields is (raw)
+		// post_content. This next line looks crazy, but it allows us to get the
+		// post ID from the model (WPGraphQL\Model\Post) and gain access to the
+		// actual post (WP_Post). In older versions this will be a bit redundant but
+		// won't hurt anything.
+		$post = get_post( $post->ID );
+
 		$blocks = $this->get_blocks_for_post( $post, $args, $context, $info );
 
 		// Allow cached blocks to be filtered to allow runtime decisions.
