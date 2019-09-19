@@ -52,7 +52,7 @@ class Fields {
 	 *
 	 * @var string
 	 */
-	private $version = '0.5.0';
+	private $version = '0.6.0';
 
 	/**
 	 * Add actions and filters.
@@ -259,6 +259,38 @@ class Fields {
 	}
 
 	/**
+	 * Resolve any connections (post IDs) that have been added to a block. We do
+	 * this after all filters have been applied and after loading from post meta
+	 * cache to avoid serializing post data / classes.
+	 *
+	 * @param  array $block Block data.
+	 * @return array
+	 */
+	public function get_block_connections( $block ) {
+		if ( is_array( $block['connections'] ) ) {
+			$block['connections'] = array_filter(
+				array_map( function ( $post_id ) {
+					$post = get_post( $post_id );
+
+					// No post? Return null so it will be removed by array_filter.
+					if ( empty( $post ) ) {
+						return null;
+					}
+
+					// Support new model layer, if present.
+					if ( class_exists( '\\WPGraphQL\\Model\\Post' ) ) {
+						return new \WPGraphQL\Model\Post( $post );
+					}
+
+					return $post;
+				}, $block['connections'] )
+			);
+		}
+
+		return $block;
+	}
+
+	/**
 	 * Get content blocks for a post.
 	 *
 	 * @param  \WP_Post    $post    Post to parse content blocks for.
@@ -271,7 +303,7 @@ class Fields {
 		// First check for cached blocks.
 		$cache = get_post_meta( $post->ID, $this->post_meta_field, true );
 		if ( $this->enable_cache && isset( $cache['version'] ) && $this->version === $cache['version'] ) {
-			return $cache['blocks'];
+			return array_map( [ $this, 'get_block_connections' ], $cache['blocks'] );
 		}
 
 		// Set a default return value.
@@ -325,7 +357,7 @@ class Fields {
 			update_post_meta( $post->ID, $this->post_meta_field, $cache_input );
 		}
 
-		return $cache_input['blocks'];
+		return array_map( [ $this, 'get_block_connections' ], $cache_input['blocks'] );
 	}
 
 	/**
