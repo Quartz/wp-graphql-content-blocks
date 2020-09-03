@@ -157,9 +157,10 @@ class HTMLBlock extends Block {
 				$leading_text = $is_valid_shortcode ? $text : $text . $raw_text;
 
 				// For each iteration push the leading text to the return array.
+				// Prevent escaped entities (&lt;code&gt;) from being unescaped.
 				$text_block = [
 					'block_class' => 'TextBlock',
-					'content'     => $leading_text,
+					'content'     => htmlspecialchars( $leading_text, ENT_NOQUOTES ),
 					'parent'      => $this,
 				];
 
@@ -205,10 +206,11 @@ class HTMLBlock extends Block {
 		}
 
 		// There are no shortcodes, just return a TextBlock for the entire text.
+		// Prevent escaped entities (&lt;code&gt;) from being unescaped.
 		return [
 			[
 				'block_class' => 'TextBlock',
-				'content'     => $html,
+				'content'     => htmlspecialchars( $html, ENT_NOQUOTES ),
 				'parent'      => $this,
 			],
 		];

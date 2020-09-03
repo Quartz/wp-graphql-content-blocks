@@ -139,8 +139,15 @@ class Validator {
 	 */
 	public function is_root_only() {
 		return (
+			// The block is defined as root_only...
 			isset( $this->definition['root_only'] ) &&
-			true === $this->definition['root_only']
+			true === $this->definition['root_only'] &&
+			// ...and does not belong to a parent whose type exempts it from being hoisted
+			(
+				! isset( $this->definition[ 'allowed_parent_types' ] ) ||
+				! is_array( $this->definition[ 'allowed_parent_types' ] ) ||
+				! in_array( $this->block->get_parent()->get_type(), $this->definition[ 'allowed_parent_types' ], true )
+			)
 		);
 	}
 
@@ -191,9 +198,9 @@ class Validator {
 	 * @return array
 	 */
 	public function filter_attributes( $attributes ) {
-		// Attribute values must be strings or null.
+		// Attribute values must be strings, numerics (coerced to strings), or null.
 		$attributes = array_filter( $attributes, function( $attribute ) {
-			return is_string( $attribute ) || is_null( $attribute );
+			return is_string( $attribute ) || is_numeric( $attribute ) || is_null( $attribute );
 		} );
 
 		// If there are no attribute rules to work with, give all the attributes back.

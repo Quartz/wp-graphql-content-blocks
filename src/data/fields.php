@@ -8,6 +8,7 @@
 namespace WPGraphQL\Extensions\ContentBlocks\Data;
 
 use GraphQL\Type\Definition\ResolveInfo;
+use GraphQLRelay\Relay;
 use WPGraphQL;
 use WPGraphQL\AppContext;
 use WPGraphQL\Extensions\ContentBlocks\Parser\GutenbergBlock;
@@ -52,7 +53,7 @@ class Fields {
 	 *
 	 * @var string
 	 */
-	private $version = '0.6.0';
+	private $version = '0.7.0';
 
 	/**
 	 * Add actions and filters.
@@ -131,7 +132,7 @@ class Fields {
 			$message = sprintf( 'Unable to generate blocks for post %d.', $post->ID );
 		}
 
-		qz_send_to_slackbot( $message, '#testing1', false, 'qzbot' );
+		do_action( 'log_to_slack', $message, '#testing1', false, 'qzbot' );
 	}
 
 	/**
@@ -293,17 +294,14 @@ class Fields {
 	/**
 	 * Get content blocks for a post.
 	 *
-	 * @param  \WP_Post    $post    Post to parse content blocks for.
-	 * @param  array       $args    Array of query args.
-	 * @param  AppContext  $context Request context.
-	 * @param  ResolveInfo $info    Information about field resolution.
+	 * @param  \WP_Post $post Post to parse content blocks for.
 	 * @return array|null
 	 */
-	private function get_blocks_for_post( \WP_Post $post, $args, AppContext $context, ResolveInfo $info ) {
+	public function get_blocks_for_post( \WP_Post $post ) {
 		// First check for cached blocks.
 		$cache = get_post_meta( $post->ID, $this->post_meta_field, true );
 		if ( $this->enable_cache && isset( $cache['version'] ) && $this->version === $cache['version'] ) {
-			return array_map( [ $this, 'get_block_connections' ], $cache['blocks'] );
+			return $cache;
 		}
 
 		// Set a default return value.
@@ -312,6 +310,9 @@ class Fields {
 			'date'    => time(),
 			'version' => $this->version,
 		];
+
+		// Compute the post's relay ID. We'll use it to construct the block's relay ID.
+		$post_relay_id = Relay::toGlobalId( get_post_type_object( $post->post_type )->graphql_single_name, $post->ID );
 
 		// First, check to see if the post has Gutenberg blocks.
 		$blocks = $this->parse_post_gutenberg_blocks( $post );
@@ -325,16 +326,17 @@ class Fields {
 		// If the parsing was successful, create a representation of the "blocks."
 		// We don't want to cache / preserve the entire (very large) tree.
 		if ( is_array( $blocks ) ) {
-			$cache_input['blocks'] = array_map( function( $block ) {
+			$cache_input['blocks'] = array_map( function( $block, $block_index ) use ( $post_relay_id ) {
 				return [
 					'attributes'     => $block->get_attributes(),
 					'attributes_raw' => $block->get_raw_attributes(), // This will not be represented in GraphQL output.
 					'connections'    => array(), // User must filter and implement this themselves.
+					'id'             => Relay::toGlobalId( 'block', "{$post_relay_id}|{$block_index}" ),
 					'innerHtml'      => $block->get_inner_html(),
 					'tagName'        => $block->get_tag_name(),
 					'type'           => $block->get_type(),
 				];
-			}, $blocks );
+			}, $blocks, array_keys( $blocks ) );
 		}
 
 		// Unset the tree to allow garbage collection.
@@ -343,21 +345,18 @@ class Fields {
 		// Allow blocks to be filtered in case further transformation is desired.
 		// Results of this operation will be cached.
 		//
-		// @param array       Array of blocks
-		// @param WP_Post     WP post object
-		// @param array       Array of query args
-		// @param AppContext  Request context
-		// @param ResolveInfo Information about field resolution
+		// @param array   Array of blocks
+		// @param WP_Post WP post object
 		// @since 0.1.8
-		$cache_input['blocks'] = apply_filters( 'graphql_blocks_output', $cache_input['blocks'], $post, $args, $context, $info );
+		$cache_input['blocks'] = apply_filters( 'graphql_blocks_output', $cache_input['blocks'], $post );
 
 		// Cache the result even if parsing was unsuccessful (to prevent repeating
-		// any expensive operations).
-		if ( $this->enable_cache ) {
+		// any expensive operations). Don't cache unpublished posts.
+		if ( $this->enable_cache && 'publish' === $post->post_status ) {
 			update_post_meta( $post->ID, $this->post_meta_field, $cache_input );
 		}
 
-		return array_map( [ $this, 'get_block_connections' ], $cache_input['blocks'] );
+		return $cache_input;
 	}
 
 	/**
@@ -379,7 +378,21 @@ class Fields {
 		// won't hurt anything.
 		$post = get_post( $post->ID );
 
-		$blocks = $this->get_blocks_for_post( $post, $args, $context, $info );
+		// Filter the post that is passed as input to our block parser. This allows
+		// us to modify the post data if we want.
+		//
+		// @param WP_Post     WP post object
+		// @param array       Array of query args
+		// @param AppContext  Request context
+		// @param ResolveInfo Information about field resolution
+		// @since 0.6.4
+		$post = apply_filters( 'graphql_blocks_get_post', $post, $args, $context, $info );
+
+		$blocks = $this->get_blocks_for_post( $post );
+
+		// Establish connections with blocks and remove all data except the blocks
+		// themselves.
+		$blocks = array_map( [ $this, 'get_block_connections' ], $blocks['blocks'] );
 
 		// Allow cached blocks to be filtered to allow runtime decisions.
 		//

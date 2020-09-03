@@ -82,6 +82,10 @@ class BlockType {
 							'type'        => Types::list_of( Types::post_object_union() ),
 							'description' => 'Objects connected to this block',
 						],
+						'id' => [
+							'type'        => Types::id(),
+							'description' => 'Relay ID of the block, encoding parent post ID and index',
+						],
 						'innerHtml' => [
 							'type'        => Types::string(),
 							'description' => 'Content block inner HTML',

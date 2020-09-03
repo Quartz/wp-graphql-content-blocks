@@ -26,8 +26,8 @@ class BlockDefinitions {
 			// removed.
 			'allow'    => null,
 
-			// An array of attributes to remove (blacklist). All other attributes
-			// are allowed. Ignored if `allow` is provided.
+			// An array of attributes to remove. All other attributes are allowed.
+			// Ignored if `allow` is provided.
 			'deny'     => [ 'class' ],
 
 			// A list of required attributes. If `null`, no attributes are required.
@@ -51,6 +51,10 @@ class BlockDefinitions {
 		// Must the block appear at the root-level of the tree?
 		// If true it will be hoisted out of its position in the tree and placed at the root level.
 		'root_only' => true,
+
+		// Does the block belong to any of these immediate parent block types?
+		// If so, override root_only and permit the block to remain nested
+		'allowed_parent_types' => [],
 
 		// Override the type to a different value?
 		'type' => null,
@@ -140,7 +144,6 @@ class BlockDefinitions {
 		],
 		'html' => [
 			'blockquote' => [],
-			'figure' => [],
 			'h1' => [],
 			'h2' => [],
 			'h3' => [],
@@ -156,9 +159,6 @@ class BlockDefinitions {
 				'root_only' => false,
 			],
 			'table' => [],
-			'ul' => [
-				'root_only' => false,
-			],
 			'a' => [
 				'attributes' => [
 					'deny' => [ 'target' ],
@@ -167,6 +167,11 @@ class BlockDefinitions {
 				'allow_root' => false,
 			],
 			'abbr' => [
+				'root_only' => false,
+				'allow_root' => false,
+			],
+			'audio' => [
+				'allow_empty' => true,
 				'root_only' => false,
 				'allow_root' => false,
 			],
@@ -210,6 +215,9 @@ class BlockDefinitions {
 				'root_only' => false,
 				'allow_root' => false,
 			],
+			'figure' => [
+				'root_only' => false,
+			],
 			'i' => [
 				'root_only' => false,
 				'allow_root' => false,
@@ -219,7 +227,9 @@ class BlockDefinitions {
 				'root_only' => false,
 				'allow_root' => false,
 			],
-			'img' => [],
+			'img' => [
+				'allowed_parent_types' => [ 'figure' ],
+			],
 			'li' => [
 				'root_only' => false,
 				'allow_root' => false,
@@ -278,6 +288,9 @@ class BlockDefinitions {
 				'root_only' => false,
 				'allow_root' => false,
 			],
+			'ul' => [
+				'root_only' => false,
+			]
 		],
 		'shortcode' => [],
 	];
