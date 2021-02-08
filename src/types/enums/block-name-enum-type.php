@@ -7,45 +7,29 @@
 
 namespace WPGraphQL\Extensions\ContentBlocks\Types\Enums;
 
-use WPGraphQL\Type\WPEnumType;
 use WPGraphQL\Extensions\ContentBlocks\Types\BlockDefinitions;
 
 /**
- * WPGraphQL Content Blocks Block Name Enum
+ * Register block name enum type.
+ *
+ * @return void
  */
-class BlockNameEnumType {
-	/**
-	 * Cached type definition.
-	 *
-	 * @var WPEnumType
-	 */
-	private static $type;
+function register_block_name_enum_type() {
+	BlockDefinitions::setup();
 
-	/**
-	 * Create type definition.
-	 *
-	 * @return WPEnumType
-	 */
-	public static function get_type() {
-		if ( self::$type ) {
-			return self::$type;
-		}
-
-		$values = [];
-		foreach ( BlockDefinitions::get_root_blocks() as $block ) {
-			$values[ BlockDefinitions::get_safe_name( $block['name'] ) ] = [
-				'value' => $block['name'],
-			];
-		}
-
-		self::$type = new WPEnumType(
-			[
-				'name'        => 'blockNameEnum',
-				'description' => 'Allowed content block names',
-				'values'      => $values,
-			]
-		);
-
-		return self::$type;
+	$values = [];
+	foreach ( BlockDefinitions::get_root_blocks() as $block ) {
+		$values[ BlockDefinitions::get_safe_name( $block['name'] ) ] = [
+			'value' => $block['name'],
+		];
 	}
+
+	register_graphql_enum_type(
+		'BlockNameEnum',
+		[
+			'description' => 'Allowed content block names',
+			'values'      => $values,
+		]
+	);
 }
+add_action( 'graphql_register_types', __NAMESPACE__ . '\\register_block_name_enum_type', 10, 0 );

@@ -45,11 +45,14 @@ class Fields {
 	 *
 	 * @var bool
 	 */
-	private $enable_cache = true;
+	private $enable_cache = false;
 
 	/**
 	 * A version number attached to the blocks object so that we can ignore
 	 * cached output of earlier versions (or later if user downgrades).
+	 *
+	 * Note that this is not the same as the plugin version, since not every
+	 * plugin change requires the post meta cache to be invalidated.
 	 *
 	 * @var string
 	 */
@@ -59,20 +62,32 @@ class Fields {
 	 * Add actions and filters.
 	 */
 	public function init() {
-		add_action( 'graphql_get_schema', array( $this, 'add_field_filters' ), 10, 0 );
+		add_action( 'graphql_register_types', array( $this, 'register_fields' ), 10, 0 );
 		add_filter( 'save_post', array( $this, 'clear_cache' ), 10, 1 );
 
 		$this->update_settings();
 	}
 
-	public function add_field_filters() {
+	/**
+	 * Register fields for blocks.
+	 *
+	 * @return void
+	 */
+	public function register_fields() {
 		$post_types = array_filter( WPGraphQL::get_allowed_post_types(), function ( $post_type ) {
 			return post_type_supports( $post_type, 'editor' );
 		} );
 
 		foreach ( $post_types as $post_type ) {
-			$type = get_post_type_object( $post_type )->graphql_single_name;
-			add_filter( "graphql_{$type}_fields", array( $this, 'add_fields' ), 10, 1 );
+			register_graphql_field(
+				get_post_type_object( $post_type )->graphql_single_name,
+				$this->field_name,
+				[
+					'type'        => [ 'list_of' => 'Block' ],
+					'description' => $this->description,
+					'resolve'     => [ $this, 'resolve' ],
+				]
+			);
 		}
 	}
 
@@ -92,28 +107,6 @@ class Fields {
 		// @since 0.2.0
 		$user_version = strval( apply_filters( 'graphql_blocks_version', '1' ) );
 		$this->version = "{$this->version}-{$user_version}";
-	}
-
-	/**
-	 * Add fields for blocks.
-	 *
-	 * @param  array $fields Array of GraphQL fields.
-	 * @return array
-	 */
-	public function add_fields( $fields ) {
-		// If the blocks field has already been defined, don't redefine (or
-		// override) it.
-		if ( isset( $fields[ $this->field_name ] ) ) {
-			return $fields;
-		}
-
-		$fields[ $this->field_name ] = array(
-			'type'        => BlockType::get_list_type(),
-			'description' => $this->description,
-			'resolve'     => array( $this, 'resolve' ),
-		);
-
-		return $fields;
 	}
 
 	/**
@@ -154,9 +147,6 @@ class Fields {
 	 * @return string $decoded_html The formatted HTML
 	 **/
 	private function prepare_html( $html ) {
-		// Strip HTML comments.
-		$html = preg_replace( '/(?=<!--)([\s\S]*?)-->/is', '', $html );
-
 		// Run a subset of the_content filters on the text.
 		$html = trim( apply_filters( 'convert_chars', wpautop( $html ) ) );
 

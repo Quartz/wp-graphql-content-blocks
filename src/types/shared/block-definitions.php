@@ -143,6 +143,7 @@ class BlockDefinitions {
 			'core/video' => [],
 		],
 		'html' => [
+			'#comment' => [],
 			'blockquote' => [],
 			'h1' => [],
 			'h2' => [],
@@ -461,9 +462,12 @@ class BlockDefinitions {
 	public static function get_safe_name( $value ) {
 		$safe_name = strtoupper( preg_replace( '#[^A-z0-9]#', '_', $value ) );
 
-		// Enum names must start with a letter or underscore.
-		if ( ! preg_match( '#^[_a-zA-Z]#', $value ) ) {
-			return '_' . $safe_name;
+		// Enum names must start with a letter. Enum names should not start with an
+		// underscores. While technically allowed, WPGraphQL transforms that into
+		// two underscores and enums starting with two underscores are reserved for
+		// internal types.
+		if ( preg_match( '#^[^A-Z]#', $safe_name ) ) {
+			$safe_name = preg_replace( '#^[^A-Z]+#', 'SAFE_', $safe_name );
 		}
 
 		return $safe_name;

@@ -364,6 +364,26 @@ class Block {
 				return $this->append_orphaned_block( $child_block );
 			}
 
+			// HTML comments are an allowed block type, but the only one worth
+			// preserving is the "read more" comment. For consistency, transform it
+			// into the Gutenberg "core/more" block.
+			if ( '#comment' === $child_block->get_type() ) {
+				if ( 'more' === trim( $child_block->get_inner_html() ) ) {
+					return $this->append_block(
+						new GutenbergBlock(
+							[
+								'attrs' => [],
+								'blockName' => 'core/more',
+								'innerHTML' => '',
+							]
+						)
+					);
+				}
+
+				// Not a "read more" comment? Redact for privacy.
+				return false;
+			}
+
 			// Is the child to add a text block? If so we will pass it to
 			// append_text_block to perform some additional checks on it.
 			if ( 'text' === $child_block->get_type() ) {
@@ -417,6 +437,11 @@ class Block {
 	 * @return false|Block
 	 **/
 	public function hoist_to_root( $child_block ) {
+		// If the child is already at the root, don't try to hoist.
+		if ( empty( $this->parent ) ) {
+			return $child_block;
+		}
+
 		$parent = $this->parent;
 
 		while ( $parent->parent ) {
