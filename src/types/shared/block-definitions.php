@@ -184,6 +184,10 @@ class BlockDefinitions {
 				'root_only' => false,
 				'allow_root' => false,
 			],
+			'cite' => [
+				'root_only' => false,
+				'allow_root' => false,
+			],
 			'code' => [
 				'root_only' => false,
 				'allow_root' => false,
