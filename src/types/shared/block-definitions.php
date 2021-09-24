@@ -233,7 +233,7 @@ class BlockDefinitions {
 				'allow_root' => false,
 			],
 			'img' => [
-				'allowed_parent_types' => [ 'figure' ],
+				'allowed_parent_types' => [ 'figure', 'a'],
 			],
 			'li' => [
 				'root_only' => false,
