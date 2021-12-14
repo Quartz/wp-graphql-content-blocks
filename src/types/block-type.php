@@ -68,6 +68,10 @@ function register_block_type() {
 					'type'        => 'ID',
 					'description' => 'Relay ID of the block, encoding parent post ID and index',
 				],
+				'parent_id' => [
+					'type'        => 'ID',
+					'description' => 'Relay ID of the parent block',
+				],
 				'innerHtml' => [
 					'type'        => 'String',
 					'description' => 'Content block inner HTML',
@@ -80,6 +84,24 @@ function register_block_type() {
 					'type'        => 'BlockNameEnum',
 					'description' => 'Content block name',
 				],
+//				/**
+//				 * @MIRO
+//				 */
+//				'innerBlocks' => [
+//					'type' => [ 'list_of' => 'Block' ],
+//					'description' => 'Nested blocks.',
+//					'resolve'     => function( $block ) {
+//						return array_map(
+//							function( $key ) use ( $block ) {
+//								return array(
+//									'name'  => $key,
+//									'value' => $block['attributes'][ $key ],
+//								);
+//							},
+//							$block['innerBlocks']
+//						);
+//					},
+//				]
 			],
 		],
 	);

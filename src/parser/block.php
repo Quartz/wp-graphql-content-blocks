@@ -80,6 +80,13 @@ class Block {
 	private $empty = true;
 
 	/**
+	 * Parent block ID.
+	 *
+	 * @var null|int
+	 */
+	public $parent_id = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param DOMDocument|DOMElement $parent Parent DOMDocument or DOMElement.
@@ -307,6 +314,13 @@ class Block {
 	 */
 	public function is_empty() {
 		return $this->empty;
+	}
+
+	/**
+	 * @MIRO
+	 */
+	public function get_inner_blocks() {
+		return $this->inner_blocks;
 	}
 
 	/**

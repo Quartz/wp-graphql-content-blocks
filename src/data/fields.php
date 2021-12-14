@@ -83,9 +83,9 @@ class Fields {
 				get_post_type_object( $post_type )->graphql_single_name,
 				$this->field_name,
 				[
-					'type'        => [ 'list_of' => 'Block' ],
+					'type' => [ 'list_of' => 'Block' ],
 					'description' => $this->description,
-					'resolve'     => [ $this, 'resolve' ],
+					'resolve' => [ $this, 'resolve' ],
 				]
 			);
 		}
@@ -112,8 +112,9 @@ class Fields {
 	/**
 	 * Log a parsing error.
 	 *
-	 * @param  WP_Post $post    Post that encountered a parsing error.
-	 * @param  string  $message Optional error message.
+	 * @param WP_Post $post Post that encountered a parsing error.
+	 * @param string $message Optional error message.
+	 *
 	 * @return void
 	 */
 	private function log_error( $post, $message = null ) {
@@ -132,7 +133,8 @@ class Fields {
 	 * Clear the post meta cache on save_post. We do this even if caching is
 	 * disabled so that there is no stale cache data if caching is reenabled.
 	 *
-	 * @param  int $post_id WP_Post Id.
+	 * @param int $post_id WP_Post Id.
+	 *
 	 * @return void
 	 */
 	public function clear_cache( $post_id ) {
@@ -143,7 +145,8 @@ class Fields {
 	 * Run the necessary WP filters on the HTML, remove newlines, and escape HTML
 	 * inside shortcode tags.
 	 *
-	 * @param  string $html The HTML to be formatted.
+	 * @param string $html The HTML to be formatted.
+	 *
 	 * @return string $decoded_html The formatted HTML
 	 **/
 	private function prepare_html( $html ) {
@@ -159,7 +162,8 @@ class Fields {
 		// to parse the shortcode later.
 		$shortcode_regex = get_shortcode_regex();
 		$pattern = '/' . $shortcode_regex . '/s';
-		return preg_replace_callback( $pattern, function( $matches ) {
+
+		return preg_replace_callback( $pattern, function ( $matches ) {
 			return htmlspecialchars( $matches[0] );
 		}, $html );
 	}
@@ -167,7 +171,8 @@ class Fields {
 	/**
 	 * Parse the content of a post and return blocks.
 	 *
-	 * @param  WP_Post $post Post to parse.
+	 * @param WP_Post $post Post to parse.
+	 *
 	 * @return array|null
 	 */
 	private function parse_post_content( $post ) {
@@ -183,13 +188,15 @@ class Fields {
 		}
 
 		$this->log_error( $post );
+
 		return null;
 	}
 
 	/**
 	 * Parse the Gutenberg blocks of a post and return our flavor of blocks.
 	 *
-	 * @param  WP_Post $post Post to parse.
+	 * @param WP_Post $post Post to parse.
+	 *
 	 * @return array|null
 	 */
 	private function parse_post_gutenberg_blocks( $post ) {
@@ -215,6 +222,13 @@ class Fields {
 			return new GutenbergBlock( $block );
 		}, $blocks );
 
+		/**
+		 * @MIRO
+		 */
+		foreach($blocks as $block) {
+			$this->handle_inner_blocks( $blocks, $block );
+		}
+
 		// Because this isn't HTML, we don't have a single block at the apex that
 		// performs validation of its children. Check validity manually.
 		return array_filter( $blocks, function ( $block ) {
@@ -229,7 +243,8 @@ class Fields {
 	 * everyone. It was removed for some reason in core. Copying from:
 	 * https://github.com/WordPress/gutenberg/blob/master/lib/blocks.php
 	 *
-	 * @param  string $content Post content.
+	 * @param string $content Post content.
+	 *
 	 * @return array  Array of parsed block objects.
 	 */
 	private function gutenberg_parse_blocks( $content ) {
@@ -254,7 +269,8 @@ class Fields {
 	 * this after all filters have been applied and after loading from post meta
 	 * cache to avoid serializing post data / classes.
 	 *
-	 * @param  array $block Block data.
+	 * @param array $block Block data.
+	 *
 	 * @return array
 	 */
 	public function get_block_connections( $block ) {
@@ -284,7 +300,8 @@ class Fields {
 	/**
 	 * Get content blocks for a post.
 	 *
-	 * @param  \WP_Post $post Post to parse content blocks for.
+	 * @param \WP_Post $post Post to parse content blocks for.
+	 *
 	 * @return array|null
 	 */
 	public function get_blocks_for_post( \WP_Post $post ) {
@@ -296,8 +313,8 @@ class Fields {
 
 		// Set a default return value.
 		$cache_input = [
-			'blocks'  => [],
-			'date'    => time(),
+			'blocks' => [],
+			'date' => time(),
 			'version' => $this->version,
 		];
 
@@ -316,15 +333,15 @@ class Fields {
 		// If the parsing was successful, create a representation of the "blocks."
 		// We don't want to cache / preserve the entire (very large) tree.
 		if ( is_array( $blocks ) ) {
-			$cache_input['blocks'] = array_map( function( $block, $block_index ) use ( $post_relay_id ) {
+			$cache_input['blocks'] = array_map( function ( $block, $block_index ) use ( $post_relay_id ) {
 				return [
-					'attributes'     => $block->get_attributes(),
+					'attributes' => $block->get_attributes(),
 					'attributes_raw' => $block->get_raw_attributes(), // This will not be represented in GraphQL output.
-					'connections'    => array(), // User must filter and implement this themselves.
-					'id'             => Relay::toGlobalId( 'block', "{$post_relay_id}|{$block_index}" ),
-					'innerHtml'      => $block->get_inner_html(),
-					'tagName'        => $block->get_tag_name(),
-					'type'           => $block->get_type(),
+					'connections' => array(), // User must filter and implement this themselves.
+					'id' => Relay::toGlobalId( 'block', "{$post_relay_id}|{$block_index}" ),
+					'innerHtml' => $block->get_inner_html(),
+					'tagName' => $block->get_tag_name(),
+					'type' => $block->get_type(),
 				];
 			}, $blocks, array_keys( $blocks ) );
 		}
@@ -352,11 +369,12 @@ class Fields {
 	/**
 	 * Resolver for content blocks.
 	 *
-	 * @param  mixed       $post    Post to parse content blocks for. Can be
+	 * @param mixed $post Post to parse content blocks for. Can be
 	 *                              WP_Post or WPGraphQL\Model\Post.
-	 * @param  array       $args    Array of query args.
-	 * @param  AppContext  $context Request context.
-	 * @param  ResolveInfo $info    Information about field resolution.
+	 * @param array $args Array of query args.
+	 * @param AppContext $context Request context.
+	 * @param ResolveInfo $info Information about field resolution.
+	 *
 	 * @return array|null
 	 */
 	public function resolve( $post, $args, AppContext $context, ResolveInfo $info ) {
@@ -398,5 +416,22 @@ class Fields {
 		// @param ResolveInfo Information about field resolution
 		// @since 0.5.0
 		return apply_filters( 'graphql_blocks_cached_output', $blocks, $post, $args, $context, $info );
+	}
+
+	/**
+	 * @MIRO
+	 *
+	 * @param $blocks
+	 * @param $block
+	 *
+	 * @return void
+	 */
+	private function handle_inner_blocks( &$blocks, $block ) {
+		if ( ! empty( $block['innerBlocks'] ) ) {
+			foreach ( $block['innerBlocks'] as $inner_block ) {
+				$blocks[] = new GutenbergBlock( $inner_block, $block['id'] );
+				$this->handle_inner_blocks( $blocks, $inner_block );
+			}
+		}
 	}
 }
