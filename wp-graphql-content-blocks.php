@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: WPGraphQL Content Blocks
- * Plugin URI: https://github.com/Quartz/wp-graphql-content-blocks
- * Description: Structured content for WPGraphQL. Parses, validates, and simplifies content into blocks.
- * Author: James Shakespeare, Chris Zarate, Quartz
- * Version: 0.4.0
+ * Plugin URI: https://github.com/mgubala-edge1s/wp-graphql-content-blocks/tree/inner-blocks
+ * Description: Structured content for WPGraphQL. Parses, validates, and simplifies content into blocks. Added innerBlocks support by FreshBooks.
+ * Author: James Shakespeare, Chris Zarate, Quartz, FreshBooks
+ * Version: 0.4.1
  * Author URI: https://qz.com/
  *
  * @package WPGraphQL Content Blocks
