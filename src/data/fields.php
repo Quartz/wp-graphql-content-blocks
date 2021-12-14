@@ -218,21 +218,16 @@ class Fields {
 		} );
 
 		// Pass to our class that will extract internals we want.
-		$blocks = array_map( function ( $block ) {
-			return new GutenbergBlock( $block );
-		}, $blocks );
-
-		/**
-		 * @MIRO
-		 */
-		foreach($blocks as $block) {
-			$this->handle_inner_blocks( $blocks, $block );
+		$gutenberg_blocks = [];
+		foreach ( $blocks as $block_index => $block ) {
+			$gutenberg_blocks[] = new GutenbergBlock( $block );
+			$gutenberg_blocks = $this->handle_inner_blocks( $gutenberg_blocks, $block, $block_index );
 		}
 
 		// Because this isn't HTML, we don't have a single block at the apex that
 		// performs validation of its children. Check validity manually.
-		return array_filter( $blocks, function ( $block ) {
-			return $block->validator->is_valid();
+		return array_filter( $gutenberg_blocks, function ( $gutenberg_block ) {
+			return $gutenberg_block->validator->is_valid();
 		} );
 	}
 
@@ -342,6 +337,7 @@ class Fields {
 					'innerHtml' => $block->get_inner_html(),
 					'tagName' => $block->get_tag_name(),
 					'type' => $block->get_type(),
+					'parent_id' => $block->get_parent_id( $post_relay_id ),
 				];
 			}, $blocks, array_keys( $blocks ) );
 		}
@@ -419,19 +415,23 @@ class Fields {
 	}
 
 	/**
-	 * @MIRO
+	 * Resolves innerBlocks recursively.
 	 *
-	 * @param $blocks
-	 * @param $block
+	 * @param array $blocks Blocks to be saved within.
+	 * @param array $block Block to be checked for inner ones.
+	 * @param int|null $parent_block_index Parent block index.
 	 *
-	 * @return void
+	 * @return array
 	 */
-	private function handle_inner_blocks( &$blocks, $block ) {
-		if ( ! empty( $block['innerBlocks'] ) ) {
+	private function handle_inner_blocks( $blocks, $block, $parent_block_index = null ) {
+		if ( ! empty( $block ) && ! empty( $block['innerBlocks'] ) && is_array( $block['innerBlocks'] ) ) {
 			foreach ( $block['innerBlocks'] as $inner_block ) {
-				$blocks[] = new GutenbergBlock( $inner_block, $block['id'] );
-				$this->handle_inner_blocks( $blocks, $inner_block );
+				$next_block_index = count( $blocks );
+				$blocks[$next_block_index] = new GutenbergBlock( $inner_block, $parent_block_index );
+				$blocks = $this->handle_inner_blocks( $blocks, $inner_block, $next_block_index );
 			}
 		}
+
+		return $blocks;
 	}
 }

@@ -7,6 +7,7 @@
 
 namespace WPGraphQL\Extensions\ContentBlocks\Parser;
 
+use GraphQLRelay\Relay;
 use WPGraphQL\Extensions\ContentBlocks\Types\BlockDefinitions;
 
 /**
@@ -84,13 +85,13 @@ class Block {
 	 *
 	 * @var null|int
 	 */
-	public $parent_id = null;
+	private $parent_block_index = null;
 
 	/**
 	 * Constructor.
 	 *
 	 * @param DOMDocument|DOMElement $parent Parent DOMDocument or DOMElement.
-	 * @param string                 $type   Node type.
+	 * @param string $type Node type.
 	 */
 	public function __construct( $parent, $type ) {
 		$this->set_parent( $parent );
@@ -106,7 +107,7 @@ class Block {
 	 * Factory method for instantiating a child block based on the block_class.
 	 *
 	 * @param string $block_class The class to instantiate.
-	 * @param array  $args        Arguments with which to instantiate the class.
+	 * @param array $args Arguments with which to instantiate the class.
 	 */
 	public function create_block( $block_class, $args ) {
 		$parent = $args['parent'];
@@ -114,21 +115,25 @@ class Block {
 		switch ( $block_class ) {
 			case 'EmbedBlock':
 				$content = $args['content'];
+
 				return new EmbedBlock( $parent, $args['type'], $args['attributes'], $args['raw'] );
 
 			case 'TextBlock':
 				$content = $args['content'];
+
 				return new TextBlock( $parent, $content );
 
 			case 'HTMLBlock':
 				$node = $args['node'];
+
 				return new HTMLBlock( $parent, $node );
 
 			case 'ShortcodeBlock':
-				$raw           = $args['raw'];
-				$type          = $args['type'];
-				$content       = $args['content'];
-				$attributes    = $args['attributes'];
+				$raw = $args['raw'];
+				$type = $args['type'];
+				$content = $args['content'];
+				$attributes = $args['attributes'];
+
 				return new ShortcodeBlock( $parent, $type, $content, $attributes, $raw );
 		}
 	}
@@ -176,7 +181,8 @@ class Block {
 	 * be returned from that offset in the children array. If index is negative,
 	 * the item will be returned that far from the end of the children array.
 	 *
-	 * @param  int $index The index of the child to return.
+	 * @param int $index The index of the child to return.
+	 *
 	 * @return Block
 	 */
 	public function get_child( $index ) {
@@ -221,7 +227,7 @@ class Block {
 		global $wp_embed;
 
 		$document = new \DOMDocument;
-		$html = array_reduce( $this->children, function( $carry, $item ) use ( $document ) {
+		$html = array_reduce( $this->children, function ( $carry, $item ) use ( $document ) {
 			return $carry . $document->saveHTML( $item->to_dom_node( $document ) );
 		}, '' );
 
@@ -246,6 +252,7 @@ class Block {
 	public function set_attributes( $attributes ) {
 		if ( empty( $attributes ) ) {
 			$this->attributes = $this->attributes_raw = [];
+
 			return;
 		}
 
@@ -317,21 +324,15 @@ class Block {
 	}
 
 	/**
-	 * @MIRO
-	 */
-	public function get_inner_blocks() {
-		return $this->inner_blocks;
-	}
-
-	/**
 	 * Check if the text block to add will be adjacent to another text block. If
 	 * so we can merge the two. Returns a merged child block or false on failure.
 	 *
-	 * @param  Block $child_block The child text block to add.
+	 * @param Block $child_block The child text block to add.
+	 *
 	 * @return false|Block
 	 */
 	private function append_text_block( $child_block ) {
-		$last_child = $this->get_child( -1 );
+		$last_child = $this->get_child( - 1 );
 
 		if ( $last_child && 'text' === $last_child->get_type() ) {
 			return $last_child->merge_block( $child_block );
@@ -345,7 +346,8 @@ class Block {
 	 * Push the child block into the this->children array. Returns the appended
 	 * block or false on failure.
 	 *
-	 * @param  Block $child_block The child block to add.
+	 * @param Block $child_block The child block to add.
+	 *
 	 * @return false|Block
 	 **/
 	private function append_block( $child_block ) {
@@ -355,6 +357,7 @@ class Block {
 
 		// This block is no longer empty.
 		$this->set_is_empty( false );
+
 		return $child_block;
 	}
 
@@ -363,6 +366,7 @@ class Block {
 	 * false on failure.
 	 *
 	 * @param Block $child_block The child block to add.
+	 *
 	 * @return false|Block
 	 */
 	public function add_child( $child_block ) {
@@ -416,15 +420,17 @@ class Block {
 	/**
 	 * Wrap orphaned blocks in an HTMLBlock ('p') so it can be added to the root.
 	 *
-	 * @param  TextBlock $child_block The orphaned text block to wrap.
+	 * @param TextBlock $child_block The orphaned text block to wrap.
+	 *
 	 * @return HTMLBlock
 	 */
 	public function append_orphaned_block( $child_block ) {
 		$wrapper = $this->create_block( 'HTMLBlock', [
 			'parent' => $this,
-			'node'   => new \DOMElement( 'p' ),
+			'node' => new \DOMElement( 'p' ),
 		] );
 		$wrapper->add_child( $child_block );
+
 		return $this->append_block( $wrapper );
 	}
 
@@ -433,6 +439,7 @@ class Block {
 	 * hoisted block or false on failure.
 	 *
 	 * @param Block $child_block The child block to add.
+	 *
 	 * @return false|Block
 	 */
 	public function hoist( $child_block ) {
@@ -448,6 +455,7 @@ class Block {
 	 * false on failure.
 	 *
 	 * @param Block $child_block The child block to add.
+	 *
 	 * @return false|Block
 	 **/
 	public function hoist_to_root( $child_block ) {
@@ -469,10 +477,11 @@ class Block {
 	 * Callback for pre_do_shortcode_tag. We need to unescape any HTML that was
 	 * escaped by ShortcodeBlock::to_dom_node.
 	 *
-	 * @param  string $return Initial return value.
-	 * @param  string $tag    Shortcode tag.
-	 * @param  array  $attr   Attribute array.
-	 * @param  array  $m      Matches array.
+	 * @param string $return Initial return value.
+	 * @param string $tag Shortcode tag.
+	 * @param array $attr Attribute array.
+	 * @param array $m Matches array.
+	 *
 	 * @return string
 	 */
 	public function unescape_shortcode_content( $return, $tag, $attr, $m ) {
@@ -488,5 +497,33 @@ class Block {
 		// Also copied from core
 		// (https://github.com/WordPress/WordPress/blob/master/wp-includes/shortcodes.php#L325).
 		return $m[1] . call_user_func( $shortcode_tags[ $tag ], $attr, $content, $tag ) . $m[6];
+	}
+
+	/**
+	 * Sets parent_id based on parent block passed in.
+	 *
+	 * @param int|null $parent_block Parent block.
+	 *
+	 * @return self
+	 */
+	public function set_parent_block_index( $parent_block_index ) {
+		$this->parent_block_index = $parent_block_index;
+
+		return $this;
+	}
+
+	/**
+	 * Returns parent_id.
+	 *
+	 * @param string $post_relay_id Post Relay ID.
+	 *
+	 * @return int|null
+	 */
+	public function get_parent_id( $post_relay_id ) {
+		if ( ! is_null( $this->parent_block_index ) ) {
+			return Relay::toGlobalId( 'block', "{$post_relay_id}|{$this->parent_block_index}" );
+		} else {
+			return null;
+		}
 	}
 }

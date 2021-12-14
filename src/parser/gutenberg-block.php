@@ -15,15 +15,15 @@ class GutenbergBlock extends Block {
 	 * Constructor
 	 *
 	 * @param array $block A gutenberg block (from gutenberg_parse_blocks).
-	 * @param null|int $parent_id Parent block ID.
+	 * @param null|int $parent_block_index Parent block index.
 	 */
-	public function __construct( $block, $parent_id = null ) {
+	public function __construct( $block, $parent_block_index = null ) {
 		parent::__construct( null, $block['blockName'] );
 
 		$this->set_content( trim( $block['innerHTML'] ) );
 		$this->add_children();
 		$this->set_attributes( $block['attrs'] );
-		$this->parent_id = $parent_id;
+		$this->set_parent_block_index( $parent_block_index );
 	}
 
 	/**
