@@ -40,9 +40,11 @@ blocks {
 	type
 	tagName
 	innerHtml
+	renderedHtml
 	attributes {
 		name
 		value
+		json
 	}
 	connections {
 		... on Post {
@@ -81,6 +83,12 @@ The stringified inner content of the block. Can be passed into a React component
 
 Note that the value of `innerHtml` is the stringified version of all the block’s descendants *after* they have been parsed. This means that any invalid tags, attributes, etc. will have been stripped out.
 
+### `renderedHtml`
+
+Type: `String`
+
+Rendered output for Gutenberg blocks.
+
 ### `attributes`
 
 Type: List of `BlockAttributeType`s
@@ -90,7 +98,18 @@ Each item in the list is a name/value pair describing an attribute of the block.
 ```json
 {
 	"name": "id",
-	"value":  "section1"
+	"value":  "section1",
+	"json": false
+}
+```
+
+If attribute is an array, it's encoded in output e.g.
+
+```json
+{
+	"name": "id",
+	"value":  "{\"section\":1}",
+	"json": true
 }
 ```
 
@@ -134,13 +153,17 @@ For this reason, we descend into the `innerHtml` of a Gutenberg block to extract
 	"type": "CORE_HEADING",
 	"tagName": "h2",
 	"attributes": [],
-	"innerHtml": "My Heading"
+	"innerHtml": "My Heading",
+	"renderedHtml": "<h2>My Heading</h2>",
+	"parent_id": null
 }
 ```
 
 In the example above, this allows the `innerHtml` to be `My Heading` instead of `<h2>My Heading</h2>`. This is a much better situation for the components that implement this data.
 
 Gutenberg blocks present a number of challenges and the spec is still evolving. Take care when using this plugin with Gutenberg blocks since there will likely be breaking changes ahead.
+
+Nested blocks structure can be recreated by using `parent_id` field. There is probably a way to return proper blocks structure using GraphQL Fragments, but for now that solution should work.
 
 ### Shortcode and Embed Blocks
 
@@ -167,7 +190,8 @@ Embed block type names are prefixed with the `EMBED_`  namespace by default.
 	"attributes": [
 		{
 			"name": "url",
-			"value": "https://twitter.com/mcwm/status/978975850455556097"
+			"value": "https://twitter.com/mcwm/status/978975850455556097",
+			"json": false
 		}
 	]
 }
@@ -315,6 +339,7 @@ Query:
 			attributes {
 				name
 				value
+				json
 			}
 		}
 	}
@@ -337,7 +362,8 @@ Response:
 					"attributes": [
 						{
 							"name": "url",
-							"value": "https://www.youtube.com/watch?v=AVbQo3IOC_A"
+							"value": "https://www.youtube.com/watch?v=AVbQo3IOC_A",
+							"json": false                          
 						}
 					]
 				},
@@ -358,11 +384,13 @@ Response:
 					"attributes": [
 						{
 							"name": "src",
-							"value": "https://example.com/fresh-prince.jpeg"
+							"value": "https://example.com/fresh-prince.jpeg",
+							"json": false
 						},
 						{
 							"name": "alt",
-							"value": "The Fresh Prince of Bel Air"
+							"value": "The Fresh Prince of Bel Air",
+							"json": false
 						}
 					]
 				}

@@ -335,9 +335,10 @@ class Fields {
 					'connections' => array(), // User must filter and implement this themselves.
 					'id' => Relay::toGlobalId( 'block', "{$post_relay_id}|{$block_index}" ),
 					'innerHtml' => $block->get_inner_html(),
+					'renderedHtml' => $block->get_rendered_content(),
 					'tagName' => $block->get_tag_name(),
 					'type' => $block->get_type(),
-					'parent_id' => $block->get_parent_id( $post_relay_id ),
+					'parent_id' => $block->get_parent_id( $post_relay_id )
 				];
 			}, $blocks, array_keys( $blocks ) );
 		}

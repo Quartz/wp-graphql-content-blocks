@@ -198,6 +198,15 @@ class Validator {
 	 * @return array
 	 */
 	public function filter_attributes( $attributes ) {
+		// Stringify arrays.
+		$attributes = array_map( function( $attribute ) {
+			if (is_array( $attribute )) {
+				return json_encode( $attribute );
+			}
+
+			return $attribute;
+		}, $attributes );
+
 		// Attribute values must be strings, numerics (coerced to strings), or null.
 		$attributes = array_filter( $attributes, function( $attribute ) {
 			return is_string( $attribute ) || is_numeric( $attribute ) || is_null( $attribute );

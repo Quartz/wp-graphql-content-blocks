@@ -26,6 +26,10 @@ function register_block_attribute_type() {
 					'type'        => 'String',
 					'description' => 'Attribute value',
 				],
+				'json' => [
+					'type'        => 'Bool',
+					'description' => 'If attribute value is encoded JSON',
+				],
 			],
 		]
 	);

@@ -27,6 +27,7 @@ function register_block_type() {
 								return array(
 									'name'  => $key,
 									'value' => $block['attributes'][ $key ],
+									'json'  => is_json( $block['attributes'][ $key ] )
 								);
 							},
 							array_keys( $block['attributes'] )
@@ -76,6 +77,10 @@ function register_block_type() {
 					'type'        => 'String',
 					'description' => 'Content block inner HTML',
 				],
+				'renderedHtml' => [
+					'type'        => 'String',
+					'description' => 'Rendered content of Gutenberg block'
+				],
 				'tagName' => [
 					'type'        => 'String',
 					'description' => 'Content block tag name (suggested)',
@@ -84,26 +89,20 @@ function register_block_type() {
 					'type'        => 'BlockNameEnum',
 					'description' => 'Content block name',
 				],
-//				/**
-//				 * @MIRO
-//				 */
-//				'innerBlocks' => [
-//					'type' => [ 'list_of' => 'Block' ],
-//					'description' => 'Nested blocks.',
-//					'resolve'     => function( $block ) {
-//						return array_map(
-//							function( $key ) use ( $block ) {
-//								return array(
-//									'name'  => $key,
-//									'value' => $block['attributes'][ $key ],
-//								);
-//							},
-//							$block['innerBlocks']
-//						);
-//					},
-//				]
 			],
 		],
 	);
 }
 add_action( 'graphql_register_types', __NAMESPACE__ . '\\register_block_type', 10, 0 );
+
+/**
+ * Check whether string is valid json.
+ *
+ * @param string $string String to be checked.
+ *
+ * @return bool
+ */
+function is_json( $string ) {
+	@json_decode( $string );
+	return json_last_error() === JSON_ERROR_NONE;
+}

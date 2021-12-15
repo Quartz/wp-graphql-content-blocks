@@ -88,6 +88,13 @@ class Block {
 	private $parent_block_index = null;
 
 	/**
+	 * Rendered content.
+	 *
+	 * @var string
+	 */
+	private $rendered_content = '';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param DOMDocument|DOMElement $parent Parent DOMDocument or DOMElement.
@@ -525,5 +532,27 @@ class Block {
 		} else {
 			return null;
 		}
+	}
+
+	/**
+	 * Sets rendered content.
+	 *
+	 * @param string $rendered_content Rendered content.
+	 *
+	 * @return $this
+	 */
+	public function set_rendered_content( $rendered_content ) {
+		$this->rendered_content = $rendered_content;
+
+		return $this;
+	}
+
+	/**
+	 * Returns rendered content.
+	 *
+	 * @return string
+	 */
+	public function get_rendered_content() {
+		return $this->rendered_content;
 	}
 }

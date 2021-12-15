@@ -24,6 +24,9 @@ class GutenbergBlock extends Block {
 		$this->add_children();
 		$this->set_attributes( $block['attrs'] );
 		$this->set_parent_block_index( $parent_block_index );
+
+		$rendered_content = apply_filters( 'the_content', render_block( $block ) );
+		$this->set_rendered_content( $rendered_content );
 	}
 
 	/**
